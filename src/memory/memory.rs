@@ -1,9 +1,9 @@
 // TODO generalize types
 pub trait Accessable {
     type Address;
-    type Data;
+    type Data: std::clone::Clone;
 
-    fn get(&self, pos: Self::Address) -> Option<&Self::Data>;
+    fn get(&mut self, pos: Self::Address) -> Option<Self::Data>;
     fn set(&mut self, pos: Self::Address, data: Self::Data) -> Result<(), std::string::String>;
 }
 
@@ -24,12 +24,12 @@ where
     type Address = u32;
     type Data = u32;
 
-    fn get(&mut self, pos: Self::Address) -> Option<&Self::Data> {
+    fn get(&mut self, pos: Self::Address) -> Option<Self::Data> {
         match self.cache.get(pos) {
             Some(data) => Some(data),
             None => {
                 if let Some(res) = self.internal_memory.get(pos) {
-                    self.cache.set(pos, res.clone());
+                    self.cache.set(pos, res.clone()).unwrap();
                     Some(res)
                 } else {
                     None
@@ -39,27 +39,36 @@ where
     }
 
     fn set(&mut self, pos: Self::Address, data: Self::Data) -> Result<(), std::string::String> {
-        self.internal_memory.set(pos, data);
+        self.internal_memory.set(pos, data).unwrap();
         Ok(())
     }
 }
 
-struct CacheMemory<T, U> {
+struct CacheMemory<T, U>
+where
+    T: std::clone::Clone,
+{
     data: T,
     tag: U,
 }
 
-pub struct RAM<T> {
+pub struct RAM<T>
+where
+    T: std::clone::Clone,
+{
     internal_memory: Vec<T>,
     mem_size: u32,
 }
 
-impl<T> Accessable for RAM<T> {
+impl<T> Accessable for RAM<T>
+where
+    T: std::clone::Clone,
+{
     type Address = u32;
     type Data = T;
 
-    fn get(&self, pos: Self::Address) -> Option<&Self::Data> {
-        Some(&self.internal_memory[pos as usize])
+    fn get(&mut self, pos: Self::Address) -> Option<Self::Data> {
+        Some(self.internal_memory[pos as usize].clone())
     }
 
     fn set(&mut self, pos: Self::Address, data: Self::Data) -> Result<(), std::string::String> {
@@ -68,25 +77,31 @@ impl<T> Accessable for RAM<T> {
     }
 }
 
-pub struct CacheDirect<T> {
+pub struct CacheDirect<T>
+where
+    T: std::clone::Clone,
+{
     internal_memory: Vec<CacheMemory<T, u32>>,
     cache_size: u32,
     line_size: u32,
     address_size: u32,
 }
 
-impl<T> Accessable for CacheDirect<T> {
+impl<T> Accessable for CacheDirect<T>
+where
+    T: std::clone::Clone,
+{
     type Address = u32;
     type Data = T;
 
-    fn get(&self, pos: Self::Address) -> Option<&Self::Data> {
+    fn get(&mut self, pos: Self::Address) -> Option<Self::Data> {
         let cache_pos = ((self.calc_line_mask() & pos) >> self.calc_line_mask().trailing_zeros())
             % (self.cache_positions() / self.line_size);
         let cache_data = &self.internal_memory[(cache_pos | pos & self.calc_word_mask()) as usize];
         if cache_data.tag as u32
             == (pos & self.calc_tag_mask()) >> self.calc_tag_mask().trailing_zeros()
         {
-            Some(&cache_data.data)
+            Some(cache_data.data.clone())
         } else {
             None
         }
@@ -106,7 +121,10 @@ impl<T> Accessable for CacheDirect<T> {
     }
 }
 
-impl<T> CacheDirect<T> {
+impl<T> CacheDirect<T>
+where
+    T: std::clone::Clone,
+{
     fn calc_tag_mask(&self) -> u32 {
         (!0 >> (type_bits::<u32>() - &self.address_size))
             ^ (self.calc_line_mask() | self.calc_word_mask())
@@ -174,7 +192,7 @@ mod tests {
 
     #[test]
     fn correct_get() {
-        let mem_test: CacheDirect<u32> = CacheDirect {
+        let mut mem_test: CacheDirect<u32> = CacheDirect {
             internal_memory: vec![
                 CacheMemory {
                     data: 1,
@@ -191,7 +209,7 @@ mod tests {
         };
 
         if let Some(x) = mem_test.get(0b10) {
-            assert!(*x == 1);
+            assert!(x == 1);
         } else {
             assert!(false);
         }
@@ -199,7 +217,7 @@ mod tests {
         assert!(mem_test.get(0b00).is_none());
 
         if let Some(x) = mem_test.get(0b01) {
-            assert!(*x == 2);
+            assert!(x == 2);
         } else {
             assert!(false);
         }
@@ -222,7 +240,7 @@ mod tests {
         mem_test.set(0b10, 1);
         mem_test.set(0b01, 2);
         if let Some(x) = mem_test.get(0b10) {
-            assert!(*x == 1);
+            assert!(x == 1);
         } else {
             assert!(false);
         }
@@ -230,7 +248,7 @@ mod tests {
         assert!(mem_test.get(0b00).is_none());
 
         if let Some(x) = mem_test.get(0b01) {
-            assert!(*x == 2);
+            assert!(x == 2);
         } else {
             assert!(false);
         }
