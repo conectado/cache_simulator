@@ -87,11 +87,11 @@ where
     address_size: U,
 }
 
-impl<T, U> Accessable for CacheDirect<T, U>
+impl<T> Accessable for CacheDirect<T>
 where
     T: std::clone::Clone,
 {
-    type Address = U;
+    type Address = u32;
     type Data = T;
 
     fn get(&mut self, pos: Self::Address) -> Option<Self::Data> {
@@ -121,7 +121,7 @@ where
     }
 }
 
-impl<T, U> CacheDirect<T, U>
+impl<T> CacheDirect<T>
 where
     T: std::clone::Clone,
 {
