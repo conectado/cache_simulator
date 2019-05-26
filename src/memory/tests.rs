@@ -1,4 +1,6 @@
 use super::*;
+use associative::*;
+use direct::*;
 #[test]
 fn correct_tag_mask() {
     let mem_test: CacheDirect<u32> = CacheDirect {
